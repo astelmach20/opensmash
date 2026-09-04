@@ -112,7 +112,8 @@ const BAKED_ASSET_BASE_URL = (
   process.env.ASSET_BASE_URL ||
   (process.env.GCS_PUBLIC_BUCKET ? `https://storage.googleapis.com/${process.env.GCS_PUBLIC_BUCKET}` : "")
 ).replace(/\/+$/, "");
-if (BAKED_ASSETS_REMOTE && !/^https?:\/\//.test(BAKED_ASSET_BASE_URL)) {
+// Absolute, or root-relative when the bucket is proxied through this origin.
+if (BAKED_ASSETS_REMOTE && !/^(https?:\/\/|\/(?!\/))/.test(BAKED_ASSET_BASE_URL)) {
   throw new Error("BAKED_ASSET_SOURCE=remote needs ASSET_BASE_URL or GCS_PUBLIC_BUCKET");
 }
 // A redirect maps a mutable name (bundles/<slug>.osb6) to an immutable object

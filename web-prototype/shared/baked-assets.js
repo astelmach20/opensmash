@@ -50,7 +50,10 @@ export function bakedAssetObjectKey(filePath, sha256) {
 
 export function bakedAssetUrl(assetBaseUrl, filePath, sha256) {
   const base = String(assetBaseUrl || "").replace(/\/+$/, "");
-  if (!/^https?:\/\//.test(base)) throw new Error(`Invalid baked asset base URL '${assetBaseUrl}'`);
+  // Absolute origin, or a root-relative path when the deployment proxies the
+  // bucket through its own origin (the bucket's CORS rule only admits the
+  // canonical site origins).
+  if (!/^(https?:\/\/|\/(?!\/))/.test(base)) throw new Error(`Invalid baked asset base URL '${assetBaseUrl}'`);
   return `${base}/${bakedAssetObjectKey(filePath, sha256).split("/").map(encodeURIComponent).join("/")}`;
 }
 

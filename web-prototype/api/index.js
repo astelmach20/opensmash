@@ -13,7 +13,9 @@ const defaults = {
   VERCEL: "1",
   ENGINE_ROOT: path.join(APP_ROOT, "engine-dist"),
   BAKED_ASSET_SOURCE: "remote",
-  GCS_PUBLIC_BUCKET: "smash-the-weights-fighter-assets",
+  // The public bucket's CORS rule only admits smash.fun, so fighter files are
+  // proxied through this origin: vercel.json rewrites /gcs/* to the bucket.
+  ASSET_BASE_URL: "/gcs",
   CREATION_ENABLED: "0",
   FIGHTER_WORKER_DISABLED: "1",
   FIREBASE_AUTH_ENABLED: "0",

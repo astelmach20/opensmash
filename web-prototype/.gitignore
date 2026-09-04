@@ -7,3 +7,5 @@ visual/assets/generated/
 engine-dist/
 public-out/
 .vercel/
+.vercel
+.env*
