@@ -4,14 +4,20 @@
 // rewritten here (vercel.json). Play-only deployment defaults: the roster is
 // served from the public GCS bucket via config/baked-assets.json, fighter
 // creation is off, Firebase auth is off, and scratch dirs live in /tmp.
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import runtimeFiles from "./runtime-files.json" with { type: "json" };
 
-const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// scripts/vercel-build.sh stages config/, dist/index.html, visual/assets/ and
-// the engine manifest under runtime/ — the one directory vercel.json includes
-// in the function bundle.
-const RUNTIME_ROOT = path.join(APP_ROOT, "runtime");
+// The files the server reads at request time (roster config, app shell,
+// engine manifest) are packed by scripts/vercel-build.sh and written out here
+// once per cold start; OPENSMASH_APP_ROOT points the server at this tree.
+const RUNTIME_ROOT = "/tmp/opensmash-runtime";
+for (const [relative, base64] of Object.entries(runtimeFiles)) {
+  const target = path.join(RUNTIME_ROOT, relative);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, Buffer.from(base64, "base64"));
+}
+
 const defaults = {
   NODE_ENV: "production",
   VERCEL: "1",

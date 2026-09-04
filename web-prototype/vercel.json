@@ -5,7 +5,6 @@
   "outputDirectory": "public-out",
   "functions": {
     "api/index.js": {
-      "includeFiles": "runtime/**",
       "maxDuration": 60
     }
   },
