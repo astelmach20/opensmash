@@ -22,4 +22,14 @@ cp -R dist/. public-out/
 rm -f public-out/index.html
 cp -R engine-dist public-out/engine
 cp -R visual/assets public-out/assets
-du -sh public-out engine-dist dist
+
+# Function-side runtime tree (api/index.js points OPENSMASH_APP_ROOT here):
+# the roster config, the app shell, site assets not covered statically, and
+# the engine manifest/shell the version check reads. Everything else the
+# engine needs is static under /engine/.
+rm -rf runtime && mkdir -p runtime/config runtime/dist runtime/visual runtime/engine-dist
+cp config/*.json runtime/config/
+cp dist/index.html runtime/dist/
+cp -R visual/assets runtime/visual/assets
+cp engine-dist/manifest.json engine-dist/index.html engine-dist/BATTLESHIP_COMMIT runtime/engine-dist/
+du -sh public-out runtime

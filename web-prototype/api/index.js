@@ -8,10 +8,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// scripts/vercel-build.sh stages config/, dist/index.html, visual/assets/ and
+// the engine manifest under runtime/ — the one directory vercel.json includes
+// in the function bundle.
+const RUNTIME_ROOT = path.join(APP_ROOT, "runtime");
 const defaults = {
   NODE_ENV: "production",
   VERCEL: "1",
-  ENGINE_ROOT: path.join(APP_ROOT, "engine-dist"),
+  OPENSMASH_APP_ROOT: RUNTIME_ROOT,
+  ENGINE_ROOT: path.join(RUNTIME_ROOT, "engine-dist"),
   BAKED_ASSET_SOURCE: "remote",
   // The public bucket's CORS rule only admits smash.fun, so fighter files are
   // proxied through this origin: vercel.json rewrites /gcs/* to the bucket.

@@ -30,7 +30,12 @@ import { bakedRosterEntries } from "../shared/baked-roster.js";
 import { ROMS_BY_SHA1, UNSUPPORTED_ROMS_BY_SHA1 } from "../shared/rom-catalog.js";
 import { ACTIVE_JOB_STATUSES } from "./job-protocol.js";
 
-const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// OPENSMASH_APP_ROOT relocates the runtime file tree (config/, dist/,
+// visual/assets/) for deployments that stage those files separately from the
+// source checkout (e.g. the Vercel function bundle, see scripts/vercel-build.sh).
+const APP_ROOT = process.env.OPENSMASH_APP_ROOT
+  ? path.resolve(process.env.OPENSMASH_APP_ROOT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const {
   pipelineProjectRoot: PIPELINE_PROJECT_ROOT,
   engineRoot: ENGINE_ROOT,

@@ -5,7 +5,7 @@
   "outputDirectory": "public-out",
   "functions": {
     "api/index.js": {
-      "includeFiles": "{dist,config,visual/assets,engine-dist}/**",
+      "includeFiles": "runtime/**",
       "maxDuration": 60
     }
   },
