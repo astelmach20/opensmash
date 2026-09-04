@@ -4,3 +4,6 @@ data/
 visual/assets/generated/
 .baked-characters/
 .DS_Store
+engine-dist/
+public-out/
+.vercel/

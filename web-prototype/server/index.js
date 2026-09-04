@@ -120,12 +120,17 @@ if (BAKED_ASSETS_REMOTE && !/^https?:\/\//.test(BAKED_ASSET_BASE_URL)) {
 // can only go stale when the roster is republished, and a deploy purges the
 // edge, so an hour is safe.
 const BAKED_REDIRECT_CACHE_CONTROL = "public, max-age=3600";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+// Turnstile and Firebase auth only guard fighter creation; a play-only
+// deployment (CREATION_ENABLED=0) runs without either.
+const CREATION_GUARDS_REQUIRED = IS_PRODUCTION && creationEnabled();
+const turnstile = createTurnstileVerifier({ isProduction: CREATION_GUARDS_REQUIRED });
 const objectStore = createObjectStore({ appRoot: APP_ROOT });
 const dispatcher = createJobDispatcher();
 const jobDatabase = createJobDatabase({
   jobsRoot: path.resolve(process.env.FIGHTER_JOBS_ROOT || path.join(APP_ROOT, "data", "fighter-jobs")),
 });
-const turnstile = createTurnstileVerifier();
+
 const fighterJobs = createFighterJobs({
   appRoot: APP_ROOT,
   repoRoot: PIPELINE_PROJECT_ROOT,
@@ -140,8 +145,7 @@ const fighterJobs = createFighterJobs({
 
 const PORT = Number(process.env.PORT || 4174);
 const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const authService = createAuthService({ isProduction: IS_PRODUCTION });
+const authService = createAuthService({ isProduction: CREATION_GUARDS_REQUIRED });
 // Bump the cookie name whenever the validation contract changes. This also
 // invalidates cookies created while the prototype was being exercised.
 const COOKIE_NAME = "opensmash_rom_v4";
@@ -1316,6 +1320,18 @@ await dispatcher.init();
 await authService.init();
 await fighterJobs.init();
 await bakedRoster().catch((error) => console.warn(`Baked roster unavailable at boot: ${error.message}`));
-server.listen(PORT, HOST, () => {
-  console.log(`OpenSmash web: http://${HOST}:${PORT}`);
-});
+// Serverless (Vercel): the platform owns the listener and invokes
+// serverlessHandler per request; the init above still runs once per cold start.
+export function serverlessHandler(req, res) {
+  return handleRequest(req, res, null).catch((error) => {
+    console.error(error);
+    if (!res.headersSent) json(res, 500, { error: "Internal server error" });
+    else res.destroy();
+  });
+}
+
+if (!process.env.VERCEL) {
+  server.listen(PORT, HOST, () => {
+    console.log(`OpenSmash web: http://${HOST}:${PORT}`);
+  });
+}
