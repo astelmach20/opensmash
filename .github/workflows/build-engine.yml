@@ -1,0 +1,118 @@
+name: Build engine (wasm)
+
+# Builds turtlesoupy/BattleShip for the browser with Emscripten — ROM-free
+# (CMake installs the ExtractAssets stub when no baserom is present; the
+# browser extracts assets from the player's own ROM via Torch wasm) — then
+# packages web-dist/ and publishes it as a GitHub Release asset that the
+# Vercel build step downloads.
+
+on:
+  workflow_dispatch:
+    inputs:
+      battleship_ref:
+        description: turtlesoupy/BattleShip ref to build
+        default: main
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-engine
+  cancel-in-progress: false
+
+jobs:
+  wasm:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout BattleShip (+ submodules)
+        uses: actions/checkout@v4
+        with:
+          repository: turtlesoupy/BattleShip
+          ref: ${{ inputs.battleship_ref }}
+          submodules: recursive
+          fetch-depth: 0
+          path: BattleShip
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build zip clang \
+            libsdl2-dev libzip-dev libglew-dev \
+            nlohmann-json3-dev libtinyxml2-dev libspdlog-dev \
+            libgl1-mesa-dev libegl1-mesa-dev \
+            libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            python3 python3-pil imagemagick file
+          sudo touch /usr/bin/zipcmp /usr/bin/zipmerge /usr/bin/ziptool
+          sudo chmod +x /usr/bin/zipcmp /usr/bin/zipmerge /usr/bin/ziptool
+          echo "CC=clang"    >> "$GITHUB_ENV"
+          echo "CXX=clang++" >> "$GITHUB_ENV"
+
+      - name: Set up emsdk
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: build-engine-wasm
+          max-size: 2G
+
+      - name: Configure (Emscripten, US, Release)
+        working-directory: BattleShip
+        run: |
+          emcc --version | head -1
+          emcmake cmake -B build-wasm -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DSSB64_VERSION=us \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build BattleShip.js
+        working-directory: BattleShip
+        run: cmake --build build-wasm --target BattleShip.js -j "$(nproc)"
+
+      - name: Build Torch wasm
+        working-directory: BattleShip
+        run: scripts/build_torch_wasm.sh
+
+      - name: Package web-dist
+        working-directory: BattleShip
+        run: |
+          scripts/package_web.sh build-wasm web-dist
+          test ! -e web-dist/files/BattleShip.o2r
+          test -f web-dist/torch/torch.wasm
+          du -sh web-dist
+          git rev-parse HEAD > web-dist/BATTLESHIP_COMMIT
+          tar -C web-dist -czf ../engine-web-dist.tar.gz .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-web-dist
+          path: engine-web-dist.tar.gz
+          retention-days: 30
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(git -C BattleShip rev-parse --short=12 HEAD)
+          TAG="engine-$SHA"
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" engine-web-dist.tar.gz -R "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" engine-web-dist.tar.gz -R "$GITHUB_REPOSITORY" \
+              --title "Engine web-dist ($SHA)" \
+              --notes "ROM-free Emscripten build of turtlesoupy/BattleShip@$(git -C BattleShip rev-parse HEAD). No ROM-derived assets; the browser extracts them from the player's own ROM."
+          fi
+          # Moving pointer for the Vercel build step.
+          if gh release view engine-latest -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload engine-latest engine-web-dist.tar.gz -R "$GITHUB_REPOSITORY" --clobber
+            gh release edit engine-latest -R "$GITHUB_REPOSITORY" --notes "Points at $TAG"
+          else
+            gh release create engine-latest engine-web-dist.tar.gz -R "$GITHUB_REPOSITORY" \
+              --title "Engine web-dist (latest)" --notes "Points at $TAG"
+          fi
